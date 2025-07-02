@@ -1,0 +1,224 @@
+version: "3.8"
+
+services:
+  api_gateway:
+    image: kong:3.4
+    environment:
+      - KONG_DATABASE=off
+      - KONG_PROXY_LISTEN=0.0.0.0:8080
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./kong_config:/usr/local/kong/declarative
+    networks:
+      - ecommerce_net
+
+  user_service:
+    build: ./user_service
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=user_db
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASS=password
+      - DB_NAME=user_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - JWT_SECRET=62e3e92d827f00b404c92698070d0a0e2e19f0d7c6c93cdfb50c5e12a40b5c416e76ea027bf7fd00331db0c50fe4ce6843862d3acd354c374263eacab68fa309
+    depends_on:
+      - user_db
+      - kafka
+    networks:
+      - ecommerce_net
+
+  api_aggregation_service:
+    build: ./api_aggregation_service
+    ports:
+      - "8007:8007"
+    environment:
+      - REDIS_URL=redis://api_cache:6379/0
+      - MONGO_URI=mongodb://api_db:27017/api_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - api_cache
+      - api_db
+      - kafka
+    networks:
+      - ecommerce_net
+
+  product_service:
+    build: ./product_service
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGO_URI=mongodb://product_db:27017/product_db
+      - ELASTICSEARCH_URL=http://product_search:9200
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - product_db
+      - product_search
+      - kafka
+    networks:
+      - ecommerce_net
+
+  order_service:
+    build: ./order_service
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql://user:password@order_db:5432/order_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - order_db
+      - kafka
+    networks:
+      - ecommerce_net
+
+  payment_service:
+    build: ./payment_service
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=postgresql://user:password@payment_db:5432/payment_db
+      - REDIS_URL=redis://payment_cache:6379/0
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - payment_db
+      - payment_cache
+      - kafka
+    networks:
+      - ecommerce_net
+
+  admin_service:
+    build: ./admin_service
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql://user:password@admin_db:5432/admin_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - admin_db
+      - kafka
+    networks:
+      - ecommerce_net
+
+  notification_service:
+    build: ./notification_service
+    ports:
+      - "8005:8005"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - ecommerce_net
+
+  analytics_service:
+    build: ./analytics_service
+    ports:
+      - "8006:8006"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - clickhouse
+      - kafka
+    networks:
+      - ecommerce_net
+
+  api_cache:
+    image: redis:6
+    networks:
+      - ecommerce_net
+
+  api_db:
+    image: mongo:5
+    environment:
+      - MONGO_INITDB_DATABASE=api_db
+    networks:
+      - ecommerce_net
+
+  user_db:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=user_db
+    networks:
+      - ecommerce_net
+
+  product_db:
+    image: mongo:5
+    environment:
+      - MONGO_INITDB_DATABASE=product_db
+    networks:
+      - ecommerce_net
+
+  product_search:
+    image: elasticsearch:8.8.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    networks:
+      - ecommerce_net
+
+  order_db:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=order_db
+    networks:
+      - ecommerce_net
+
+  payment_db:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=payment_db
+    networks:
+      - ecommerce_net
+
+  payment_cache:
+    image: redis:6
+    networks:
+      - ecommerce_net
+
+  admin_db:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=admin_db
+    networks:
+      - ecommerce_net
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    networks:
+      - ecommerce_net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    depends_on:
+      - zookeeper
+    networks:
+      - ecommerce_net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    networks:
+      - ecommerce_net
+
+networks:
+  ecommerce_net:
+    driver: bridge
