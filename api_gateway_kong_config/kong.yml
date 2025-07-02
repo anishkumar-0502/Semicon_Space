@@ -1,0 +1,17 @@
+_format_version: "3.0"
+services:
+  - name: user_service
+    url: http://user_service:8000
+    routes:
+      - name: user-route
+        paths:
+          - /users
+plugins:
+  - name: kafka-log
+    config:
+      bootstrap_servers:
+        - http:192.168.1.38:9092
+      topic: user.request
+
+
+

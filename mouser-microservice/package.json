@@ -1,0 +1,21 @@
+{
+  "name": "mouser-microservice",
+  "version": "1.0.0",
+  "main": "mouser-microservice.js",
+  "scripts": {
+    "start": "node mouser-microservice.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.0",
+    "express": "^5.1.0",
+    "mongoose": "^8.16.1",
+    "xml2js": "^0.6.2"
+  }
+}
